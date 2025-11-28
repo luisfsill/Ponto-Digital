@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Geofence } from '@/types';
-import { MapPin, Plus, X, ArrowLeft, QrCode, Download, ExternalLink } from 'lucide-react';
+import { MapPin, Plus, X, ArrowLeft, QrCode, Download, ExternalLink, Pencil } from 'lucide-react';
 import { getAuthHeaders } from '@/lib/authHeaders';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -23,7 +23,9 @@ function AdminGeofencesContent() {
     const [geofences, setGeofences] = useState<Geofence[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
     const [selectedGeofenceForQR, setSelectedGeofenceForQR] = useState<Geofence | null>(null);
+    const [selectedGeofenceForEdit, setSelectedGeofenceForEdit] = useState<Geofence | null>(null);
     const qrRef = useRef<HTMLDivElement>(null);
 
     // Form state
@@ -32,6 +34,13 @@ function AdminGeofencesContent() {
     const [lon, setLon] = useState('');
     const [radius, setRadius] = useState('100');
     const [gettingLocation, setGettingLocation] = useState(false);
+
+    // Edit form state
+    const [editName, setEditName] = useState('');
+    const [editLat, setEditLat] = useState('');
+    const [editLon, setEditLon] = useState('');
+    const [editRadius, setEditRadius] = useState('');
+    const [gettingEditLocation, setGettingEditLocation] = useState(false);
 
     useEffect(() => {
         fetchGeofences();
@@ -103,6 +112,79 @@ function AdminGeofencesContent() {
             console.error('Failed to toggle geofence', error);
             showError('Erro de conexão');
         }
+    };
+
+    const openEditModal = (geofence: Geofence) => {
+        setSelectedGeofenceForEdit(geofence);
+        setEditName(geofence.name);
+        setEditLat(geofence.latitude.toString());
+        setEditLon(geofence.longitude.toString());
+        setEditRadius(geofence.radius.toString());
+        setShowEditModal(true);
+    };
+
+    const handleEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedGeofenceForEdit) return;
+
+        try {
+            const authHeaders = await getAuthHeaders();
+            const res = await fetch(`/api/geofences?id=${selectedGeofenceForEdit.id}`, {
+                method: 'PATCH',
+                headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editName,
+                    latitude: parseFloat(editLat),
+                    longitude: parseFloat(editLon),
+                    radius: parseFloat(editRadius),
+                }),
+            });
+
+            if (res.ok) {
+                setShowEditModal(false);
+                setSelectedGeofenceForEdit(null);
+                fetchGeofences();
+                showSuccess('Geofence atualizada com sucesso!');
+            } else {
+                showError('Erro ao atualizar geofence');
+            }
+        } catch (error) {
+            console.error('Failed to update geofence', error);
+            showError('Erro de conexão ao atualizar geofence');
+        }
+    };
+
+    const getEditCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            showError('Geolocalização não é suportada pelo seu navegador');
+            return;
+        }
+        
+        setGettingEditLocation(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setEditLat(position.coords.latitude.toString());
+                setEditLon(position.coords.longitude.toString());
+                setGettingEditLocation(false);
+                showSuccess('Localização obtida com sucesso!');
+            },
+            (error) => {
+                setGettingEditLocation(false);
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        showError('Permissão de localização negada.');
+                        break;
+                    default:
+                        showError('Erro ao obter localização.');
+                        break;
+                }
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
     };
 
     const getGeofenceQRUrl = (geofenceId: string) => {
@@ -225,15 +307,25 @@ function AdminGeofencesContent() {
                                         <p className="text-sm text-muted mt-1">
                                             Raio: {fence.radius}m
                                         </p>
-                                        <button
-                                            onClick={() => setSelectedGeofenceForQR(fence)}
-                                            className="btn btn-outline mt-4"
-                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                                            disabled={!fence.active}
-                                        >
-                                            <QrCode size={18} />
-                                            Gerar QR Code
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                                            <button
+                                                onClick={() => openEditModal(fence)}
+                                                className="btn btn-outline"
+                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                                            >
+                                                <Pencil size={18} />
+                                                Editar
+                                            </button>
+                                            <button
+                                                onClick={() => setSelectedGeofenceForQR(fence)}
+                                                className="btn btn-outline"
+                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                                                disabled={!fence.active}
+                                            >
+                                                <QrCode size={18} />
+                                                QR Code
+                                            </button>
+                                        </div>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem' }}>
                                         <span className={`badge ${fence.active ? 'badge-success' : 'badge-error'}`} style={{ marginTop: '1rem' }}>
@@ -382,6 +474,87 @@ function AdminGeofencesContent() {
                                 </div>
                                 <button type="submit" className="btn btn-primary w-full">
                                     Criar Geofence
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit Geofence Modal */}
+                {showEditModal && selectedGeofenceForEdit && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <button
+                                onClick={() => {
+                                    setShowEditModal(false);
+                                    setSelectedGeofenceForEdit(null);
+                                }}
+                                className="close-btn"
+                            >
+                                <X size={24} />
+                            </button>
+                            <h2 className="text-xl font-bold mb-6">Editar Geofence</h2>
+                            <form onSubmit={handleEdit}>
+                                <div className="input-group">
+                                    <label className="label">Nome</label>
+                                    <input
+                                        type="text"
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                        className="input"
+                                        placeholder="Ex: Escritório Principal"
+                                        required
+                                    />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="input-group">
+                                        <label className="label">Latitude</label>
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            value={editLat}
+                                            onChange={(e) => setEditLat(e.target.value)}
+                                            className="input"
+                                            placeholder="-23.5505"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="input-group">
+                                        <label className="label">Longitude</label>
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            value={editLon}
+                                            onChange={(e) => setEditLon(e.target.value)}
+                                            className="input"
+                                            placeholder="-46.6333"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={getEditCurrentLocation}
+                                    className="btn btn-outline mb-6"
+                                    style={{ width: '100%', marginTop: '-0.5rem' }}
+                                    disabled={gettingEditLocation}
+                                >
+                                    <MapPin size={16} />
+                                    {gettingEditLocation ? 'Obtendo localização...' : 'Usar minha localização atual'}
+                                </button>
+                                <div className="input-group">
+                                    <label className="label">Raio (metros)</label>
+                                    <input
+                                        type="number"
+                                        value={editRadius}
+                                        onChange={(e) => setEditRadius(e.target.value)}
+                                        className="input"
+                                        placeholder="100"
+                                        required
+                                    />
+                                </div>
+                                <button type="submit" className="btn btn-primary w-full">
+                                    Salvar Alterações
                                 </button>
                             </form>
                         </div>

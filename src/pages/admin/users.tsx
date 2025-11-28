@@ -480,7 +480,7 @@ function AdminUsersContent() {
                 {/* QR Code Modal */}
                 {selectedUserForQR && (
                     <div className="modal-overlay">
-                        <div className="modal-content flex-center" style={{ flexDirection: 'column', textAlign: 'center' }}>
+                        <div className="modal-content flex-center" style={{ flexDirection: 'column', textAlign: 'center', maxWidth: '700px' }}>
                             <button
                                 onClick={() => setSelectedUserForQR(null)}
                                 className="close-btn"
@@ -492,10 +492,10 @@ function AdminUsersContent() {
                                 Peça para <strong>{selectedUserForQR.name}</strong> escanear este QR Code com o celular.
                             </p>
 
-                            <div style={{ background: 'white', padding: '1.25rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+                            <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
                                 <QRCodeSVG
                                     value={getBindingUrl(selectedUserForQR.id)}
-                                    size={200}
+                                    size={600}
                                     level="H"
                                 />
                             </div>

@@ -43,15 +43,23 @@ export default async function handler(
         return res.status(201).json(data);
     } else if (req.method === 'PATCH') {
         const { id } = req.query;
-        const { active } = req.body;
+        const { active, name, latitude, longitude, radius } = req.body;
 
         if (!id) {
             return res.status(400).json({ error: 'ID is required' });
         }
 
+        // Build update object with only provided fields
+        const updateData: Record<string, any> = {};
+        if (active !== undefined) updateData.active = active;
+        if (name !== undefined) updateData.name = name;
+        if (latitude !== undefined) updateData.latitude = latitude;
+        if (longitude !== undefined) updateData.longitude = longitude;
+        if (radius !== undefined) updateData.radius = radius;
+
         const { data, error } = await supabase
             .from('geofences')
-            .update({ active })
+            .update(updateData)
             .eq('id', id)
             .select()
             .single();
