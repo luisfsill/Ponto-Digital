@@ -15,6 +15,10 @@ create table public.users (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
   role text not null check (role in ('admin', 'funcionario')),
+  works_saturday boolean default false,
+  part_time boolean default false,
+  work_start_time time,
+  work_end_time time,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -46,7 +50,7 @@ create table public.geofences (
 -- Records (Ponto) Table
 create table public.records (
   id uuid primary key default uuid_generate_v4(),
-  user_id uuid references public.users(id) not null,
+  user_id uuid references public.users(id) on delete cascade not null,
   device_id text not null,
   timestamp timestamp with time zone default timezone('utc'::text, now()) not null,
   geofence_id uuid references public.geofences(id),

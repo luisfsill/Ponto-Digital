@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -28,6 +28,11 @@ function AdminGeofencesContent() {
     const [selectedGeofenceForEdit, setSelectedGeofenceForEdit] = useState<Geofence | null>(null);
     const qrRef = useRef<HTMLDivElement>(null);
 
+    // Estados de animação de fechamento
+    const [closingAddModal, setClosingAddModal] = useState(false);
+    const [closingEditModal, setClosingEditModal] = useState(false);
+    const [closingQRModal, setClosingQRModal] = useState(false);
+
     // Form state
     const [name, setName] = useState('');
     const [lat, setLat] = useState('');
@@ -41,6 +46,36 @@ function AdminGeofencesContent() {
     const [editLon, setEditLon] = useState('');
     const [editRadius, setEditRadius] = useState('');
     const [gettingEditLocation, setGettingEditLocation] = useState(false);
+
+    // Funções de fechamento com animação
+    const closeAddModal = useCallback(() => {
+        setClosingAddModal(true);
+        setTimeout(() => {
+            setShowAddModal(false);
+            setClosingAddModal(false);
+            setName('');
+            setLat('');
+            setLon('');
+            setRadius('100');
+        }, 250);
+    }, []);
+
+    const closeEditModal = useCallback(() => {
+        setClosingEditModal(true);
+        setTimeout(() => {
+            setShowEditModal(false);
+            setClosingEditModal(false);
+            setSelectedGeofenceForEdit(null);
+        }, 250);
+    }, []);
+
+    const closeQRModal = useCallback(() => {
+        setClosingQRModal(true);
+        setTimeout(() => {
+            setSelectedGeofenceForQR(null);
+            setClosingQRModal(false);
+        }, 250);
+    }, []);
 
     useEffect(() => {
         fetchGeofences();
@@ -104,13 +139,9 @@ function AdminGeofencesContent() {
 
             if (res.ok) {
                 fetchGeofences();
-                showSuccess(`Geofence ${!geofence.active ? 'ativada' : 'desativada'} com sucesso!`);
-            } else {
-                showError('Erro ao alterar status da geofence');
             }
         } catch (error) {
             console.error('Failed to toggle geofence', error);
-            showError('Erro de conexão');
         }
     };
 
@@ -297,7 +328,7 @@ function AdminGeofencesContent() {
             <div className="mb-8">
                 <button
                     onClick={() => router.push('/admin')}
-                    className="btn btn-outline mb-4"
+                    className="btn btn-primary mb-4"
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                 >
                     <ArrowLeft size={18} />
@@ -362,10 +393,10 @@ function AdminGeofencesContent() {
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                                         <button
                                             onClick={() => openEditModal(fence)}
-                                            className="btn btn-outline"
+                                            className="btn btn-outline btn-edit"
                                             title="Editar"
                                         >
-                                            <Pencil size={18} />
+                                            <Pencil size={18} className="icon-edit" />
                                         </button>
                                         <button
                                             onClick={() => setSelectedGeofenceForQR(fence)}
@@ -404,10 +435,10 @@ function AdminGeofencesContent() {
 
                 {/* QR Code Modal for Geofence */}
                 {selectedGeofenceForQR && (
-                    <div className="modal-overlay">
-                        <div className="modal-content flex-center" style={{ flexDirection: 'column', textAlign: 'center', maxHeight: '95vh', overflow: 'hidden', padding: '1.5rem' }}>
+                    <div className={`modal-overlay ${closingQRModal ? 'closing' : ''}`}>
+                        <div className={`modal-content flex-center ${closingQRModal ? 'closing' : ''}`} style={{ flexDirection: 'column', textAlign: 'center', maxHeight: '95vh', overflow: 'hidden', padding: '1.5rem' }}>
                             <button
-                                onClick={() => setSelectedGeofenceForQR(null)}
+                                onClick={closeQRModal}
                                 className="close-btn"
                             >
                                 <X size={24} />
@@ -453,10 +484,10 @@ function AdminGeofencesContent() {
                 )}
 
                 {showAddModal && (
-                    <div className="modal-overlay">
-                        <div className="modal-content">
+                    <div className={`modal-overlay ${closingAddModal ? 'closing' : ''}`}>
+                        <div className={`modal-content ${closingAddModal ? 'closing' : ''}`}>
                             <button
-                                onClick={() => setShowAddModal(false)}
+                                onClick={closeAddModal}
                                 className="close-btn"
                             >
                                 <X size={24} />
@@ -531,13 +562,10 @@ function AdminGeofencesContent() {
 
                 {/* Edit Geofence Modal */}
                 {showEditModal && selectedGeofenceForEdit && (
-                    <div className="modal-overlay">
-                        <div className="modal-content">
+                    <div className={`modal-overlay ${closingEditModal ? 'closing' : ''}`}>
+                        <div className={`modal-content ${closingEditModal ? 'closing' : ''}`}>
                             <button
-                                onClick={() => {
-                                    setShowEditModal(false);
-                                    setSelectedGeofenceForEdit(null);
-                                }}
+                                onClick={closeEditModal}
                                 className="close-btn"
                             >
                                 <X size={24} />

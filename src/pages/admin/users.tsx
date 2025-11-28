@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -29,9 +29,68 @@ function AdminUsersContent() {
     const [selectedUserForQR, setSelectedUserForQR] = useState<User | null>(null);
     const [selectedUserForDevices, setSelectedUserForDevices] = useState<User | null>(null);
     const [selectedUserForEdit, setSelectedUserForEdit] = useState<User | null>(null);
+    
+    // Estados de animação de fechamento
+    const [closingAddModal, setClosingAddModal] = useState(false);
+    const [closingEditModal, setClosingEditModal] = useState(false);
+    const [closingDevicesModal, setClosingDevicesModal] = useState(false);
+    const [closingQRModal, setClosingQRModal] = useState(false);
     const [newName, setNewName] = useState('');
+    const [newWorksSaturday, setNewWorksSaturday] = useState(false);
+    const [newPartTime, setNewPartTime] = useState(false);
+    const [newWorkStartTime, setNewWorkStartTime] = useState('');
+    const [newWorkEndTime, setNewWorkEndTime] = useState('');
     const [editName, setEditName] = useState('');
+    const [editWorksSaturday, setEditWorksSaturday] = useState(false);
+    const [editPartTime, setEditPartTime] = useState(false);
+    const [editWorkStartTime, setEditWorkStartTime] = useState('');
+    const [editWorkEndTime, setEditWorkEndTime] = useState('');
     const [editingDevice, setEditingDevice] = useState<{deviceId: string, name: string} | null>(null);
+
+    // Funções de fechamento com animação
+    const closeAddModal = useCallback(() => {
+        setClosingAddModal(true);
+        setTimeout(() => {
+            setShowAddModal(false);
+            setClosingAddModal(false);
+            setNewName('');
+            setNewWorksSaturday(false);
+            setNewPartTime(false);
+            setNewWorkStartTime('');
+            setNewWorkEndTime('');
+        }, 250);
+    }, []);
+
+    const closeEditModal = useCallback(() => {
+        setClosingEditModal(true);
+        setTimeout(() => {
+            setShowEditModal(false);
+            setClosingEditModal(false);
+            setSelectedUserForEdit(null);
+            setEditName('');
+            setEditWorksSaturday(false);
+            setEditPartTime(false);
+            setEditWorkStartTime('');
+            setEditWorkEndTime('');
+        }, 250);
+    }, []);
+
+    const closeDevicesModal = useCallback(() => {
+        setClosingDevicesModal(true);
+        setTimeout(() => {
+            setShowDevicesModal(false);
+            setClosingDevicesModal(false);
+            setSelectedUserForDevices(null);
+        }, 250);
+    }, []);
+
+    const closeQRModal = useCallback(() => {
+        setClosingQRModal(true);
+        setTimeout(() => {
+            setSelectedUserForQR(null);
+            setClosingQRModal(false);
+        }, 250);
+    }, []);
 
     useEffect(() => {
         fetchUsers();
@@ -63,7 +122,14 @@ function AdminUsersContent() {
             const res = await fetch('/api/users', {
                 method: 'POST',
                 headers: { ...authHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newName, role: 'funcionario' }),
+                body: JSON.stringify({ 
+                    name: newName, 
+                    role: 'funcionario',
+                    works_saturday: newWorksSaturday,
+                    part_time: newPartTime,
+                    work_start_time: newPartTime ? newWorkStartTime : null,
+                    work_end_time: newPartTime ? newWorkEndTime : null
+                }),
             });
 
             const data = await res.json();
@@ -71,6 +137,10 @@ function AdminUsersContent() {
             if (res.ok) {
                 setShowAddModal(false);
                 setNewName('');
+                setNewWorksSaturday(false);
+                setNewPartTime(false);
+                setNewWorkStartTime('');
+                setNewWorkEndTime('');
                 fetchUsers();
                 showSuccess('Usuário criado com sucesso!');
             } else {
@@ -92,7 +162,13 @@ function AdminUsersContent() {
             const res = await fetch(`/api/users?id=${selectedUserForEdit.id}`, {
                 method: 'PUT',
                 headers: { ...authHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: editName }),
+                body: JSON.stringify({ 
+                    name: editName,
+                    works_saturday: editWorksSaturday,
+                    part_time: editPartTime,
+                    work_start_time: editPartTime ? editWorkStartTime : null,
+                    work_end_time: editPartTime ? editWorkEndTime : null
+                }),
             });
 
             const data = await res.json();
@@ -101,6 +177,10 @@ function AdminUsersContent() {
                 setShowEditModal(false);
                 setSelectedUserForEdit(null);
                 setEditName('');
+                setEditWorksSaturday(false);
+                setEditPartTime(false);
+                setEditWorkStartTime('');
+                setEditWorkEndTime('');
                 fetchUsers();
                 showSuccess('Usuário atualizado com sucesso!');
             } else {
@@ -223,6 +303,10 @@ function AdminUsersContent() {
     const openEditModal = (user: User) => {
         setSelectedUserForEdit(user);
         setEditName(user.name);
+        setEditWorksSaturday(user.works_saturday || false);
+        setEditPartTime(user.part_time || false);
+        setEditWorkStartTime(user.work_start_time || '');
+        setEditWorkEndTime(user.work_end_time || '');
         setShowEditModal(true);
     };
 
@@ -238,7 +322,7 @@ function AdminUsersContent() {
             <div className="mb-8">
                 <button
                     onClick={() => router.push('/admin')}
-                    className="btn btn-outline mb-4"
+                    className="btn btn-primary mb-4"
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                 >
                     <ArrowLeft size={18} />
@@ -271,17 +355,10 @@ function AdminUsersContent() {
                                 <div className="user-actions" style={{ display: 'flex', gap: '0.5rem' }}>
                                     <button
                                         onClick={() => openEditModal(user)}
-                                        className="btn btn-outline"
+                                        className="btn btn-outline btn-edit"
                                         title="Editar"
                                     >
-                                        <Pencil size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDeleteUser(user.id, user.name)}
-                                        className="btn btn-danger"
-                                        title="Excluir"
-                                    >
-                                        <Trash2 size={18} />
+                                        <Pencil size={18} className="icon-edit" />
                                     </button>
                                     <button
                                         onClick={() => openDevicesModal(user)}
@@ -298,6 +375,13 @@ function AdminUsersContent() {
                                     >
                                         <QrCode size={18} />
                                     </button>
+                                    <button
+                                        onClick={() => handleDeleteUser(user.id, user.name)}
+                                        className="btn btn-danger"
+                                        title="Excluir"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
                                 </div>
                             </div>
                         ))}
@@ -306,10 +390,10 @@ function AdminUsersContent() {
 
                 {/* Add User Modal */}
                 {showAddModal && (
-                    <div className="modal-overlay">
-                        <div className="modal-content">
+                    <div className={`modal-overlay ${closingAddModal ? 'closing' : ''}`}>
+                        <div className={`modal-content ${closingAddModal ? 'closing' : ''}`}>
                             <button
-                                onClick={() => setShowAddModal(false)}
+                                onClick={closeAddModal}
                                 className="close-btn"
                             >
                                 <X size={24} />
@@ -327,6 +411,64 @@ function AdminUsersContent() {
                                         placeholder="Nome do usuário"
                                     />
                                 </div>
+
+                                <div className="input-group">
+                                    <label className="checkbox-wrapper">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={newWorksSaturday}
+                                            onChange={(e) => setNewWorksSaturday(e.target.checked)}
+                                        />
+                                        <span className="checkmark">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12"></polyline>
+                                            </svg>
+                                        </span>
+                                        <span className="checkbox-label">Trabalha aos sábados</span>
+                                    </label>
+                                </div>
+
+                                <div className="input-group">
+                                    <label className="checkbox-wrapper">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={newPartTime}
+                                            onChange={(e) => setNewPartTime(e.target.checked)}
+                                        />
+                                        <span className="checkmark">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12"></polyline>
+                                            </svg>
+                                        </span>
+                                        <span className="checkbox-label">Trabalha meio período</span>
+                                    </label>
+                                </div>
+
+                                {newPartTime && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                        <div className="input-group" style={{ marginBottom: 0 }}>
+                                            <label className="label">Início</label>
+                                            <input
+                                                type="time"
+                                                value={newWorkStartTime}
+                                                onChange={(e) => setNewWorkStartTime(e.target.value)}
+                                                className="input"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="input-group" style={{ marginBottom: 0 }}>
+                                            <label className="label">Fim</label>
+                                            <input
+                                                type="time"
+                                                value={newWorkEndTime}
+                                                onChange={(e) => setNewWorkEndTime(e.target.value)}
+                                                className="input"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
                                 <button type="submit" className="btn btn-primary w-full">
                                     Criar
                                 </button>
@@ -337,14 +479,10 @@ function AdminUsersContent() {
 
                 {/* Edit User Modal */}
                 {showEditModal && selectedUserForEdit && (
-                    <div className="modal-overlay">
-                        <div className="modal-content">
+                    <div className={`modal-overlay ${closingEditModal ? 'closing' : ''}`}>
+                        <div className={`modal-content ${closingEditModal ? 'closing' : ''}`}>
                             <button
-                                onClick={() => {
-                                    setShowEditModal(false);
-                                    setSelectedUserForEdit(null);
-                                    setEditName('');
-                                }}
+                                onClick={closeEditModal}
                                 className="close-btn"
                             >
                                 <X size={24} />
@@ -362,6 +500,64 @@ function AdminUsersContent() {
                                         placeholder="Nome do usuário"
                                     />
                                 </div>
+
+                                <div className="input-group">
+                                    <label className="checkbox-wrapper">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={editWorksSaturday}
+                                            onChange={(e) => setEditWorksSaturday(e.target.checked)}
+                                        />
+                                        <span className="checkmark">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12"></polyline>
+                                            </svg>
+                                        </span>
+                                        <span className="checkbox-label">Trabalha aos sábados</span>
+                                    </label>
+                                </div>
+
+                                <div className="input-group">
+                                    <label className="checkbox-wrapper">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={editPartTime}
+                                            onChange={(e) => setEditPartTime(e.target.checked)}
+                                        />
+                                        <span className="checkmark">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12"></polyline>
+                                            </svg>
+                                        </span>
+                                        <span className="checkbox-label">Trabalha meio período</span>
+                                    </label>
+                                </div>
+
+                                {editPartTime && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                        <div className="input-group" style={{ marginBottom: 0 }}>
+                                            <label className="label">Início</label>
+                                            <input
+                                                type="time"
+                                                value={editWorkStartTime}
+                                                onChange={(e) => setEditWorkStartTime(e.target.value)}
+                                                className="input"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="input-group" style={{ marginBottom: 0 }}>
+                                            <label className="label">Fim</label>
+                                            <input
+                                                type="time"
+                                                value={editWorkEndTime}
+                                                onChange={(e) => setEditWorkEndTime(e.target.value)}
+                                                className="input"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
                                 <button type="submit" className="btn btn-primary w-full">
                                     Salvar
                                 </button>
@@ -372,13 +568,10 @@ function AdminUsersContent() {
 
                 {/* Devices Modal */}
                 {showDevicesModal && selectedUserForDevices && (
-                    <div className="modal-overlay">
-                        <div className="modal-content">
+                    <div className={`modal-overlay ${closingDevicesModal ? 'closing' : ''}`}>
+                        <div className={`modal-content ${closingDevicesModal ? 'closing' : ''}`}>
                             <button
-                                onClick={() => {
-                                    setShowDevicesModal(false);
-                                    setSelectedUserForDevices(null);
-                                }}
+                                onClick={closeDevicesModal}
                                 className="close-btn"
                             >
                                 <X size={24} />
@@ -477,10 +670,10 @@ function AdminUsersContent() {
 
                 {/* QR Code Modal */}
                 {selectedUserForQR && (
-                    <div className="modal-overlay">
-                        <div className="modal-content flex-center" style={{ flexDirection: 'column', textAlign: 'center', maxWidth: '700px' }}>
+                    <div className={`modal-overlay ${closingQRModal ? 'closing' : ''}`}>
+                        <div className={`modal-content flex-center ${closingQRModal ? 'closing' : ''}`} style={{ flexDirection: 'column', textAlign: 'center', maxWidth: '700px' }}>
                             <button
-                                onClick={() => setSelectedUserForQR(null)}
+                                onClick={closeQRModal}
                                 className="close-btn"
                             >
                                 <X size={24} />

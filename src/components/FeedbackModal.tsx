@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 export type FeedbackType = 'success' | 'error' | 'warning' | 'info' | 'confirm';
@@ -20,7 +20,31 @@ export default function FeedbackModal({
     message,
     onConfirm,
 }: FeedbackModalProps) {
-    if (!isOpen) return null;
+    const [isClosing, setIsClosing] = useState(false);
+    const [shouldRender, setShouldRender] = useState(isOpen);
+
+    useEffect(() => {
+        if (isOpen) {
+            setShouldRender(true);
+            setIsClosing(false);
+        }
+    }, [isOpen]);
+
+    const handleClose = () => {
+        setIsClosing(true);
+        setTimeout(() => {
+            setShouldRender(false);
+            setIsClosing(false);
+            onClose();
+        }, 250); // Duração da animação de saída
+    };
+
+    const handleConfirm = () => {
+        if (onConfirm) onConfirm();
+        handleClose();
+    };
+
+    if (!shouldRender) return null;
 
     const getIcon = () => {
         switch (type) {
@@ -47,12 +71,12 @@ export default function FeedbackModal({
     };
 
     return (
-        <div className="modal-overlay" style={{ zIndex: 1000 }}>
+        <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} style={{ zIndex: 1000 }}>
             <div 
-                className="modal-content flex-center" 
+                className={`modal-content flex-center ${isClosing ? 'closing' : ''}`}
                 style={{ flexDirection: 'column', textAlign: 'center', maxWidth: '400px' }}
             >
-                <button onClick={onClose} className="close-btn">
+                <button onClick={handleClose} className="close-btn">
                     <X size={24} />
                 </button>
 
@@ -66,14 +90,11 @@ export default function FeedbackModal({
                 <div className="modal-actions w-full">
                     {type === 'confirm' ? (
                         <>
-                            <button onClick={onClose} className="btn btn-outline">
+                            <button onClick={handleClose} className="btn btn-outline">
                                 Cancelar
                             </button>
                             <button
-                                onClick={() => {
-                                    if (onConfirm) onConfirm();
-                                    onClose();
-                                }}
+                                onClick={handleConfirm}
                                 className={`btn ${getButtonColor()}`}
                             >
                                 Confirmar
@@ -81,7 +102,7 @@ export default function FeedbackModal({
                         </>
                     ) : (
                         <button
-                            onClick={onClose}
+                            onClick={handleClose}
                             className={`btn ${getButtonColor()} w-full`}
                         >
                             OK

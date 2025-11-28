@@ -37,7 +37,7 @@ export default async function handler(
         const { data: users, error } = await supabase
             .from('users')
             .select('*, devices:device_authorizations(*)')
-            .order('created_at', { ascending: false });
+            .order('name', { ascending: true });
 
         if (error) return res.status(500).json({ error: error.message });
         return res.status(200).json(users);
@@ -45,14 +45,21 @@ export default async function handler(
 
     else if (req.method === 'POST') {
         // Create user
-        const { name, role } = req.body;
+        const { name, role, works_saturday, part_time, work_start_time, work_end_time } = req.body;
         if (!name || !role) {
             return res.status(400).json({ error: 'Name and role are required' });
         }
 
         const { data, error } = await supabase
             .from('users')
-            .insert({ name, role })
+            .insert({ 
+                name, 
+                role,
+                works_saturday: works_saturday || false,
+                part_time: part_time || false,
+                work_start_time: part_time ? work_start_time : null,
+                work_end_time: part_time ? work_end_time : null
+            })
             .select()
             .single();
 
@@ -63,7 +70,7 @@ export default async function handler(
     else if (req.method === 'PUT') {
         // Update user
         const { id } = req.query;
-        const { name } = req.body;
+        const { name, works_saturday, part_time, work_start_time, work_end_time } = req.body;
 
         if (!id || !name) {
             return res.status(400).json({ error: 'ID and name are required' });
@@ -71,7 +78,13 @@ export default async function handler(
 
         const { data, error } = await supabase
             .from('users')
-            .update({ name })
+            .update({ 
+                name,
+                works_saturday: works_saturday || false,
+                part_time: part_time || false,
+                work_start_time: part_time ? work_start_time : null,
+                work_end_time: part_time ? work_end_time : null
+            })
             .eq('id', id)
             .select()
             .single();
@@ -81,13 +94,24 @@ export default async function handler(
     }
 
     else if (req.method === 'DELETE') {
-        // Delete user (device_authorizations will cascade delete)
+        // Delete user (need to delete records first due to foreign key constraint)
         const { id } = req.query;
 
         if (!id) {
             return res.status(400).json({ error: 'ID is required' });
         }
 
+        // First, delete all records associated with this user
+        const { error: recordsError } = await supabase
+            .from('records')
+            .delete()
+            .eq('user_id', id);
+
+        if (recordsError) {
+            return res.status(500).json({ error: `Erro ao excluir registros: ${recordsError.message}` });
+        }
+
+        // Then, delete the user (device_authorizations will cascade delete)
         const { error } = await supabase
             .from('users')
             .delete()

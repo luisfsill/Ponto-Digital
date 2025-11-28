@@ -4,6 +4,10 @@ export interface User {
     id: string
     name: string
     role: Role
+    works_saturday?: boolean
+    part_time?: boolean
+    work_start_time?: string
+    work_end_time?: string
     created_at: string
     // Populated via join with device_authorizations
     devices?: DeviceAuthorization[]

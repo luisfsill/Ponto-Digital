@@ -189,7 +189,7 @@ export default function Ponto() {
                         </div>
                     )}
 
-                    <Link href="/" className="btn btn-outline" style={{ marginTop: '1.5rem', width: '100%' }}>
+                    <Link href="/" className="btn btn-primary" style={{ marginTop: '1.5rem', width: '100%' }}>
                         <ArrowLeft size={16} />
                         Voltar para Início
                     </Link>
