@@ -28,7 +28,8 @@ export default async function handler(
             return res.status(401).json({ error: 'Dispositivo não reconhecido. Vincule seu dispositivo primeiro.' });
         }
 
-        const user = deviceAuth.users as { id: string; name: string };
+        const usersData = deviceAuth.users as unknown as { id: string; name: string };
+        const user = usersData;
 
         let validGeofence = null;
 
