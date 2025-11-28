@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import Layout from '@/components/Layout';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Smartphone, ScanLine, X } from 'lucide-react';
+import { Smartphone, ScanLine, X, MapPin, RefreshCw } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
   const [showScanner, setShowScanner] = useState(false);
   const [scannerReady, setScannerReady] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
   const scannerRef = useRef<any>(null);
 
   // Iniciar scanner quando o modal estiver pronto
@@ -107,6 +108,54 @@ export default function Home() {
     setScannerReady(false);
   };
 
+  const handleRegistrarPonto = () => {
+    if (!navigator.geolocation) {
+      setScanError('Geolocalização não é suportada pelo seu navegador.');
+      return;
+    }
+
+    setLocationStatus('requesting');
+    setScanError(null);
+
+    // Usar watchPosition para forçar localização fresca (sem cache)
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        // Localização obtida - parar o watch e redirecionar
+        navigator.geolocation.clearWatch(watchId);
+        setLocationStatus('granted');
+        router.push('/ponto');
+      },
+      (error) => {
+        navigator.geolocation.clearWatch(watchId);
+        setLocationStatus('denied');
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setScanError('Permissão de localização negada. Habilite nas configurações do navegador para registrar o ponto.');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setScanError('Localização indisponível. Verifique se o GPS está ativado.');
+            break;
+          case error.TIMEOUT:
+            setScanError('Tempo esgotado ao obter localização. Tente novamente.');
+            break;
+          default:
+            setScanError('Erro ao obter localização. Tente novamente.');
+            break;
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0  // NUNCA usar cache
+      }
+    );
+
+    // Timeout de segurança
+    setTimeout(() => {
+      navigator.geolocation.clearWatch(watchId);
+    }, 16000);
+  };
+
   return (
     <Layout>
       <div className="flex-center" style={{ minHeight: '60vh', flexDirection: 'column', textAlign: 'center', gap: '2rem' }}>
@@ -126,15 +175,26 @@ export default function Home() {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: '400px' }}>
-          <Link href="/ponto" className="glass-panel card home-card-neon" style={{ width: '100%', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <button 
+            onClick={handleRegistrarPonto}
+            disabled={locationStatus === 'requesting'}
+            className="glass-panel card home-card-neon" 
+            style={{ width: '100%', border: 'none', cursor: locationStatus === 'requesting' ? 'wait' : 'pointer', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'inherit' }}
+          >
             <div className="card-icon">
-              <Smartphone size={40} />
+              {locationStatus === 'requesting' ? (
+                <RefreshCw size={40} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Smartphone size={40} />
+              )}
             </div>
-            <h2 className="card-title" style={{ fontSize: '1.5rem' }}>Registrar Ponto</h2>
+            <h2 className="card-title" style={{ fontSize: '1.5rem' }}>
+              {locationStatus === 'requesting' ? 'Obtendo localização...' : 'Registrar Ponto'}
+            </h2>
             <p className="card-desc">
-              Registrar entrada/saída manualmente.
+              {locationStatus === 'requesting' ? 'Aguarde...' : 'Registrar entrada/saída manualmente.'}
             </p>
-          </Link>
+          </button>
 
           <button 
             onClick={openScanner}

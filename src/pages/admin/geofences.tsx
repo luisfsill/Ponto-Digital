@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Geofence } from '@/types';
-import { MapPin, Plus, X, ArrowLeft, QrCode, Download, ExternalLink, Pencil } from 'lucide-react';
+import { MapPin, Plus, X, ArrowLeft, QrCode, Download, ExternalLink, Pencil, Trash2 } from 'lucide-react';
 import { getAuthHeaders } from '@/lib/authHeaders';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -19,7 +19,7 @@ export default function AdminGeofences() {
 
 function AdminGeofencesContent() {
     const router = useRouter();
-    const { showSuccess, showError } = useFeedback();
+    const { showSuccess, showError, showConfirm } = useFeedback();
     const [geofences, setGeofences] = useState<Geofence[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -112,6 +112,32 @@ function AdminGeofencesContent() {
             console.error('Failed to toggle geofence', error);
             showError('Erro de conexão');
         }
+    };
+
+    const handleDelete = (geofence: Geofence) => {
+        showConfirm(
+            `Tem certeza que deseja excluir a geofence "${geofence.name}"?`,
+            async () => {
+                try {
+                    const authHeaders = await getAuthHeaders();
+                    const res = await fetch(`/api/geofences?id=${geofence.id}`, {
+                        method: 'DELETE',
+                        headers: authHeaders,
+                    });
+
+                    if (res.ok) {
+                        fetchGeofences();
+                        showSuccess('Geofence excluída com sucesso!');
+                    } else {
+                        showError('Erro ao excluir geofence');
+                    }
+                } catch (error) {
+                    console.error('Failed to delete geofence', error);
+                    showError('Erro de conexão ao excluir geofence');
+                }
+            },
+            'Excluir Geofence'
+        );
     };
 
     const openEditModal = (geofence: Geofence) => {
@@ -292,43 +318,26 @@ function AdminGeofencesContent() {
                 {loading ? (
                     <p className="text-muted">Carregando...</p>
                 ) : (
-                    <div className="grid-dashboard" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))' }}>
+                    <div className="geofence-list">
                         {geofences.map((fence) => (
-                            <div key={fence.id} className="glass-panel" style={{ padding: '1.5rem' }}>
-                                <div className="flex-between" style={{ alignItems: 'flex-start' }}>
-                                    <div>
-                                        <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <MapPin size={18} className={fence.active ? 'text-success' : 'text-error'} />
-                                            {fence.name}
-                                        </h3>
-                                        <p className="text-sm text-muted mt-3">
-                                            Lat: {fence.latitude.toFixed(6)}, Lon: {fence.longitude.toFixed(6)}
-                                        </p>
-                                        <p className="text-sm text-muted mt-1">
-                                            Raio: {fence.radius}m
-                                        </p>
-                                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                                            <button
-                                                onClick={() => openEditModal(fence)}
-                                                className="btn btn-outline"
-                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                                            >
-                                                <Pencil size={18} />
-                                                Editar
-                                            </button>
-                                            <button
-                                                onClick={() => setSelectedGeofenceForQR(fence)}
-                                                className="btn btn-outline"
-                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                                                disabled={!fence.active}
-                                            >
-                                                <QrCode size={18} />
-                                                QR Code
-                                            </button>
+                            <div key={fence.id} className="glass-panel geofence-item" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                                    {/* Info */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1', minWidth: '200px' }}>
+                                        <MapPin size={24} className={fence.active ? 'text-success' : 'text-error'} />
+                                        <div>
+                                            <h3 className="card-title" style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>
+                                                {fence.name}
+                                            </h3>
+                                            <p className="text-xs text-muted">
+                                                Lat: {fence.latitude.toFixed(6)}, Lon: {fence.longitude.toFixed(6)} | Raio: {fence.radius}m
+                                            </p>
                                         </div>
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem' }}>
-                                        <span className={`badge ${fence.active ? 'badge-success' : 'badge-error'}`} style={{ marginTop: '1rem' }}>
+
+                                    {/* Status e Toggle */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        <span className={`badge ${fence.active ? 'badge-success' : 'badge-error'}`}>
                                             {fence.active ? 'Ativo' : 'Inativo'}
                                         </span>
                                         <label className="switch">
@@ -348,16 +357,55 @@ function AdminGeofencesContent() {
                                             </div>
                                         </label>
                                     </div>
+
+                                    {/* Ações */}
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button
+                                            onClick={() => openEditModal(fence)}
+                                            className="btn btn-outline"
+                                            title="Editar"
+                                        >
+                                            <Pencil size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedGeofenceForQR(fence)}
+                                            className="btn btn-outline"
+                                            title="QR Code"
+                                            disabled={!fence.active}
+                                        >
+                                            <QrCode size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(fence)}
+                                            className="btn btn-danger"
+                                            title="Excluir"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
+                        {geofences.length === 0 && (
+                            <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+                                <MapPin size={48} className="text-muted" style={{ marginBottom: '1rem' }} />
+                                <p className="text-muted">Nenhuma geofence cadastrada.</p>
+                                <button
+                                    onClick={() => setShowAddModal(true)}
+                                    className="btn btn-primary mt-4"
+                                >
+                                    <Plus size={20} />
+                                    Criar primeira geofence
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
                 {/* QR Code Modal for Geofence */}
                 {selectedGeofenceForQR && (
                     <div className="modal-overlay">
-                        <div className="modal-content flex-center" style={{ flexDirection: 'column', textAlign: 'center' }}>
+                        <div className="modal-content flex-center" style={{ flexDirection: 'column', textAlign: 'center', maxHeight: '95vh', overflow: 'hidden', padding: '1.5rem' }}>
                             <button
                                 onClick={() => setSelectedGeofenceForQR(null)}
                                 className="close-btn"
@@ -365,39 +413,40 @@ function AdminGeofencesContent() {
                                 <X size={24} />
                             </button>
                             <h2 className="text-xl font-bold mb-2">QR Code - Bater Ponto</h2>
-                            <p className="text-sm text-muted mb-6">
+                            <p className="text-sm text-muted mb-4">
                                 Escaneie este QR Code para registrar ponto em <strong>{selectedGeofenceForQR.name}</strong>
                             </p>
 
-                            <div ref={qrRef} style={{ background: 'white', padding: '1.25rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+                            <div ref={qrRef} style={{ background: 'white', padding: '1rem', borderRadius: '16px', marginBottom: '1rem' }}>
                                 <QRCodeSVG
                                     value={getGeofenceQRUrl(selectedGeofenceForQR.id)}
-                                    size={200}
+                                    size={300}
                                     level="H"
                                 />
                             </div>
 
-                            <button
-                                onClick={downloadQRCode}
-                                className="btn btn-primary mb-4"
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                            >
-                                <Download size={18} />
-                                Baixar QR Code
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                                <button
+                                    onClick={downloadQRCode}
+                                    className="btn btn-primary"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                                >
+                                    <Download size={18} />
+                                    Baixar QR Code
+                                </button>
 
-                            <button
-                                onClick={() => window.open(getGeofenceQRUrl(selectedGeofenceForQR.id), '_blank')}
-                                className="btn btn-outline mb-4"
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                            >
-                                <ExternalLink size={18} />
-                                Acessar via Link
-                            </button>
+                                <button
+                                    onClick={() => window.open(getGeofenceQRUrl(selectedGeofenceForQR.id), '_blank')}
+                                    className="btn btn-outline"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                                >
+                                    <ExternalLink size={18} />
+                                    Acessar via Link
+                                </button>
+                            </div>
 
-                            <p className="text-xs text-muted" style={{ maxWidth: '280px' }}>
+                            <p className="text-xs text-muted" style={{ maxWidth: '320px' }}>
                                 O funcionário deve escanear este código com o celular vinculado para bater o ponto.
-                                A localização e o dispositivo serão verificados automaticamente.
                             </p>
                         </div>
                     </div>

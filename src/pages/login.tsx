@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Head from 'next/head';
 import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/context/ThemeContext';
-import { Eye, EyeOff, AlertCircle, Moon, Sun, Home } from 'lucide-react';
-import Link from 'next/link';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import Layout from '@/components/Layout';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -14,7 +12,6 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
     const { signIn, user } = useAuth();
-    const { theme, toggleTheme } = useTheme();
     const router = useRouter();
 
     useEffect(() => {
@@ -40,32 +37,8 @@ export default function Login() {
     };
 
     return (
-        <>
-            <Head>
-                <title>Login - Ponto Digital</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-            </Head>
-            <div className="login-page">
-                {/* Top Navigation */}
-                <div style={{ position: 'absolute', top: '1.5rem', left: '0', right: '0', display: 'flex', justifyContent: 'center', gap: '1rem', zIndex: 10 }}>
-                    <Link
-                        href="/"
-                        className="btn btn-outline"
-                        style={{ padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                    >
-                        <Home size={18} />
-                        <span>Home</span>
-                    </Link>
-                    <button
-                        onClick={toggleTheme}
-                        className="btn btn-outline"
-                        style={{ padding: '0.5rem' }}
-                        aria-label="Toggle Theme"
-                    >
-                        {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-                    </button>
-                </div>
-
+        <Layout title="Login - Ponto Digital">
+            <div className="flex-center" style={{ minHeight: '70vh' }}>
                 <div className="login-container fade-in-up">
                     <div className="login-header">
                         <h1 className="login-title">
@@ -158,12 +131,8 @@ export default function Login() {
                             )}
                         </button>
                     </form>
-
-                    <div className="login-footer">
-                        <span className="text-muted">Ponto Digital</span>
-                    </div>
                 </div>
             </div>
-        </>
+        </Layout>
     );
 }

@@ -278,8 +278,7 @@ function AdminUsersContent() {
                                     </button>
                                     <button
                                         onClick={() => handleDeleteUser(user.id, user.name)}
-                                        className="btn btn-outline"
-                                        style={{ color: 'var(--error)', borderColor: 'var(--error)' }}
+                                        className="btn btn-danger"
                                         title="Excluir"
                                     >
                                         <Trash2 size={18} />
@@ -454,8 +453,7 @@ function AdminUsersContent() {
                                                 )}
                                                 <button
                                                     onClick={() => handleRemoveDevice(selectedUserForDevices.id, device.device_id)}
-                                                    className="btn btn-outline btn-icon"
-                                                    style={{ color: 'var(--error)', borderColor: 'var(--error)' }}
+                                                    className="btn btn-danger btn-icon"
                                                     title="Remover Dispositivo"
                                                 >
                                                     <Trash2 size={16} />

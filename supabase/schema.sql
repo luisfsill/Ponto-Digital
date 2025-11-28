@@ -50,6 +50,7 @@ create table public.records (
   device_id text not null,
   timestamp timestamp with time zone default timezone('utc'::text, now()) not null,
   geofence_id uuid references public.geofences(id),
+  record_type text check (record_type in ('entrada', 'saida')),
   location jsonb not null, -- {lat, lon, accuracy}
   ip text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null

@@ -66,6 +66,20 @@ export default async function handler(
 
         if (error) return res.status(500).json({ error: error.message });
         return res.status(200).json(data);
+    } else if (req.method === 'DELETE') {
+        const { id } = req.query;
+
+        if (!id) {
+            return res.status(400).json({ error: 'ID is required' });
+        }
+
+        const { error } = await supabase
+            .from('geofences')
+            .delete()
+            .eq('id', id);
+
+        if (error) return res.status(500).json({ error: error.message });
+        return res.status(200).json({ message: 'Geofence excluída com sucesso' });
     } else {
         return res.status(405).json({ error: 'Method not allowed' });
     }

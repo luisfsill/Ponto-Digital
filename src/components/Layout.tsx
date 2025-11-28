@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
-import { Moon, Sun, LogOut, User, Shield } from 'lucide-react';
+import { Moon, Sun, LogOut, User, Shield, Home } from 'lucide-react';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -16,6 +16,7 @@ export default function Layout({ children, title = 'Ponto Digital' }: LayoutProp
     const { user, signOut } = useAuth();
     const router = useRouter();
     const isAdminPage = router.pathname.startsWith('/admin');
+    const isLoginPage = router.pathname === '/login';
 
     return (
         <>
@@ -26,11 +27,33 @@ export default function Layout({ children, title = 'Ponto Digital' }: LayoutProp
             <div className="app-container">
                 <header className="app-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center', width: '100%' }}>
+                        {/* Botão Home - visível na página de login */}
+                        {isLoginPage && (
+                            <Link
+                                href="/"
+                                className="btn btn-outline"
+                                style={{ padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                            >
+                                <Home size={18} />
+                                <span>Home</span>
+                            </Link>
+                        )}
                         {user && isAdminPage && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                                 <User size={16} className="text-muted" />
                                 <span className="text-sm text-muted">{user.email}</span>
                             </div>
+                        )}
+                        {/* Botão Área Administrativa - visível quando não está em /admin e não está em /login */}
+                        {!isAdminPage && !isLoginPage && (
+                            <Link
+                                href="/admin"
+                                className="btn btn-outline"
+                                style={{ padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                            >
+                                <Shield size={18} />
+                                <span>Admin</span>
+                            </Link>
                         )}
                         {/* Toggle Theme - sempre visível */}
                         <button
@@ -41,17 +64,6 @@ export default function Layout({ children, title = 'Ponto Digital' }: LayoutProp
                         >
                             {mounted && (theme === 'light' ? <Moon size={18} /> : <Sun size={18} />)}
                         </button>
-                        {/* Botão Área Administrativa - visível quando não está em /admin */}
-                        {!isAdminPage && (
-                            <Link
-                                href="/admin"
-                                className="btn btn-outline"
-                                style={{ padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                            >
-                                <Shield size={18} />
-                                <span>Admin</span>
-                            </Link>
-                        )}
                         {user && isAdminPage && (
                             <button
                                 onClick={signOut}

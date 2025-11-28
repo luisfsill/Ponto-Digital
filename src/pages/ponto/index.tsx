@@ -20,27 +20,69 @@ export default function Ponto() {
     const [userName, setUserName] = useState('');
 
     useEffect(() => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setLocation({
-                        lat: position.coords.latitude,
-                        lon: position.coords.longitude,
-                        accuracy: position.coords.accuracy,
-                    });
-                    setLocLoading(false);
-                },
-                (error) => {
-                    console.error('Geolocation error:', error);
-                    setLocError('Permissão de localização negada ou indisponível.');
-                    setLocLoading(false);
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        } else {
+        if (!navigator.geolocation) {
             setLocError('Geolocalização não suportada neste navegador.');
             setLocLoading(false);
+            return;
         }
+
+        // Usar watchPosition para obter localização mais precisa e atualizada
+        // Isso força o GPS a buscar uma nova posição
+        const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                // Só aceita localização com boa precisão (menos de 100m)
+                // ou após alguns segundos aceita qualquer uma
+                const accuracy = position.coords.accuracy;
+                
+                setLocation({
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+                    accuracy: accuracy,
+                });
+                setLocLoading(false);
+                
+                // Para o watch após obter uma boa localização
+                if (accuracy < 100) {
+                    navigator.geolocation.clearWatch(watchId);
+                }
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        setLocError('Permissão de localização negada. Habilite nas configurações.');
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        setLocError('Localização indisponível. Verifique se o GPS está ativado.');
+                        break;
+                    case error.TIMEOUT:
+                        setLocError('Tempo esgotado ao obter localização.');
+                        break;
+                    default:
+                        setLocError('Erro ao obter localização.');
+                }
+                setLocLoading(false);
+            },
+            { 
+                enableHighAccuracy: true, 
+                timeout: 15000, 
+                maximumAge: 0  // NUNCA usar cache
+            }
+        );
+
+        // Timeout de segurança - para o watch após 20 segundos
+        const timeoutId = setTimeout(() => {
+            navigator.geolocation.clearWatch(watchId);
+            if (locLoading) {
+                setLocError('Não foi possível obter localização precisa. Tente novamente.');
+                setLocLoading(false);
+            }
+        }, 20000);
+
+        return () => {
+            navigator.geolocation.clearWatch(watchId);
+            clearTimeout(timeoutId);
+        };
     }, []);
 
     const handleRegister = async () => {
