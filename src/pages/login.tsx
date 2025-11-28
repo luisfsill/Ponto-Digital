@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { Eye, EyeOff, AlertCircle, Moon, Sun } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Moon, Sun, Home } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -45,14 +46,25 @@ export default function Login() {
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
             </Head>
             <div className="login-page">
-                {/* Theme Toggle */}
-                <button
-                    onClick={toggleTheme}
-                    className="theme-toggle"
-                    aria-label="Toggle Theme"
-                >
-                    {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-                </button>
+                {/* Top Navigation */}
+                <div style={{ position: 'absolute', top: '1.5rem', left: '0', right: '0', display: 'flex', justifyContent: 'center', gap: '1rem', zIndex: 10 }}>
+                    <Link
+                        href="/"
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                        <Home size={18} />
+                        <span>Home</span>
+                    </Link>
+                    <button
+                        onClick={toggleTheme}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem' }}
+                        aria-label="Toggle Theme"
+                    >
+                        {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                    </button>
+                </div>
 
                 <div className="login-container fade-in-up">
                     <div className="login-header">

@@ -25,8 +25,7 @@ export default function Layout({ children, title = 'Ponto Digital' }: LayoutProp
             </Head>
             <div className="app-container">
                 <header className="app-header">
-                    {/* Logo removido */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'flex-end', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center', width: '100%' }}>
                         {user && isAdminPage && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                                 <User size={16} className="text-muted" />

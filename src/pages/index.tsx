@@ -111,7 +111,7 @@ export default function Home() {
     <Layout>
       <div className="flex-center" style={{ minHeight: '60vh', flexDirection: 'column', textAlign: 'center', gap: '2rem' }}>
         <div style={{ marginBottom: '1rem' }}>
-          <h1 style={{ fontSize: '3rem', fontWeight: 800, color: 'white', marginBottom: '1rem' }}>
+          <h1 className="home-title" style={{ fontSize: '3rem', fontWeight: 800, marginBottom: '1rem' }}>
             Ponto Digital
           </h1>
           <p className="text-muted" style={{ fontSize: '1.25rem', maxWidth: '600px', margin: '0 auto' }}>
@@ -127,7 +127,7 @@ export default function Home() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: '400px' }}>
           <Link href="/ponto" className="glass-panel card home-card-neon" style={{ width: '100%', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div className="card-icon" style={{ color: 'white', background: 'rgba(255, 255, 255, 0.1)' }}>
+            <div className="card-icon">
               <Smartphone size={40} />
             </div>
             <h2 className="card-title" style={{ fontSize: '1.5rem' }}>Registrar Ponto</h2>
@@ -141,11 +141,11 @@ export default function Home() {
             className="glass-panel card home-card-neon" 
             style={{ width: '100%', border: 'none', cursor: 'pointer', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'inherit' }}
           >
-            <div className="card-icon" style={{ color: 'white', background: 'rgba(255, 255, 255, 0.1)' }}>
+            <div className="card-icon">
               <ScanLine size={40} />
             </div>
-            <h2 className="card-title" style={{ fontSize: '1.5rem', color: 'white' }}>Escanear QR Code</h2>
-            <p className="card-desc" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+            <h2 className="card-title" style={{ fontSize: '1.5rem' }}>Escanear QR Code</h2>
+            <p className="card-desc">
               Bater ponto ou vincular dispositivo.
             </p>
           </button>
