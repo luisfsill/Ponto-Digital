@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Record, RecordType, DailyWorkSummary } from '@/types';
-import { format, parseISO, differenceInMinutes } from 'date-fns';
+import { format, parseISO, differenceInMinutes, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getAuthHeaders } from '@/lib/authHeaders';
-import { ArrowLeft, Download, Upload, Clock, TrendingUp, TrendingDown, Minus, LogIn, LogOut } from 'lucide-react';
+import { ArrowLeft, Download, Upload, Clock, TrendingUp, TrendingDown, Minus, LogIn, LogOut, Search, Filter, X, Calendar, User } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 import { useFeedback } from '@/context/FeedbackContext';
 
@@ -18,6 +19,14 @@ function AdminRecordsContent() {
     const [viewMode, setViewMode] = useState<'records' | 'summary'>('records');
     const [dailySummaries, setDailySummaries] = useState<DailyWorkSummary[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Estados de busca e filtro
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterEmployee, setFilterEmployee] = useState<string>('all');
+    const [filterType, setFilterType] = useState<'all' | 'entrada' | 'saida'>('all');
+    const [filterDateStart, setFilterDateStart] = useState('');
+    const [filterDateEnd, setFilterDateEnd] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
 
     // Configuração de horas esperadas por dia (em minutos) - 8 horas = 480 minutos
     const EXPECTED_WORK_MINUTES = 480;
@@ -173,32 +182,54 @@ function AdminRecordsContent() {
     };
 
     const handleExport = () => {
-        if (records.length === 0) {
+        if (filteredRecords.length === 0) {
             showError('Não há registros para exportar');
             return;
         }
 
-        // Create CSV content
-        const headers = ['Usuário', 'Data/Hora', 'Tipo'];
-        const csvContent = [
-            headers.join(';'),
-            ...records.map(record => [
-                record.users?.name || 'Desconhecido',
-                format(new Date(record.timestamp), "dd/MM/yyyy HH:mm:ss", { locale: ptBR }),
-                record.record_type === 'entrada' ? 'Entrada' : 'Saída'
-            ].join(';'))
-        ].join('\n');
+        // Criar dados para a planilha de registros
+        const registrosData = filteredRecords.map(record => ({
+            'Funcionário': record.users?.name || 'Desconhecido',
+            'Data': format(new Date(record.timestamp), "dd/MM/yyyy", { locale: ptBR }),
+            'Hora': format(new Date(record.timestamp), "HH:mm:ss", { locale: ptBR }),
+            'Tipo': record.record_type === 'entrada' ? 'Entrada' : 'Saída'
+        }));
 
-        // Create and download file
-        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `registros-ponto-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        // Criar dados para a planilha de resumo diário
+        const resumoData = filteredSummaries.map(summary => ({
+            'Data': format(parseISO(summary.date), "dd/MM/yyyy", { locale: ptBR }),
+            'Funcionário': summary.userName,
+            'Registros': summary.records.map(r => `${r.type === 'entrada' ? '→' : '←'} ${r.time}`).join(' | '),
+            'Horas Trabalhadas': formatWorkedTime(summary.totalWorkedMinutes),
+            'Saldo': formatMinutesToHours(summary.balanceMinutes)
+        }));
+
+        // Criar dados para a planilha de banco de horas
+        const bancoHorasData = filteredBankHours.map(user => ({
+            'Funcionário': user.name,
+            'Saldo Total': formatMinutesToHours(user.totalBalance)
+        }));
+
+        // Criar workbook com múltiplas abas
+        const wb = XLSX.utils.book_new();
+
+        // Aba de Registros
+        const wsRegistros = XLSX.utils.json_to_sheet(registrosData);
+        wsRegistros['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 10 }, { wch: 10 }];
+        XLSX.utils.book_append_sheet(wb, wsRegistros, 'Registros');
+
+        // Aba de Resumo Diário
+        const wsResumo = XLSX.utils.json_to_sheet(resumoData);
+        wsResumo['!cols'] = [{ wch: 12 }, { wch: 25 }, { wch: 40 }, { wch: 18 }, { wch: 15 }];
+        XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo Diário');
+
+        // Aba de Banco de Horas
+        const wsBanco = XLSX.utils.json_to_sheet(bancoHorasData);
+        wsBanco['!cols'] = [{ wch: 25 }, { wch: 15 }];
+        XLSX.utils.book_append_sheet(wb, wsBanco, 'Banco de Horas');
+
+        // Gerar arquivo e fazer download
+        XLSX.writeFile(wb, `registros-ponto-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.xlsx`);
         
         showSuccess('Registros exportados com sucesso!');
     };
@@ -272,6 +303,117 @@ function AdminRecordsContent() {
 
     const bankHours = calculateTotalBankHours();
 
+    // Lista única de funcionários para o filtro
+    const uniqueEmployees = useMemo(() => {
+        const employees = new Map<string, string>();
+        records.forEach(record => {
+            if (record.users?.name && record.user_id) {
+                employees.set(record.user_id, record.users.name);
+            }
+        });
+        return Array.from(employees.entries()).map(([id, name]) => ({ id, name }));
+    }, [records]);
+
+    // Filtrar registros
+    const filteredRecords = useMemo(() => {
+        return records.filter(record => {
+            // Filtro por busca (nome do funcionário)
+            if (searchTerm) {
+                const name = record.users?.name?.toLowerCase() || '';
+                if (!name.includes(searchTerm.toLowerCase())) {
+                    return false;
+                }
+            }
+
+            // Filtro por funcionário
+            if (filterEmployee !== 'all' && record.user_id !== filterEmployee) {
+                return false;
+            }
+
+            // Filtro por tipo (entrada/saída)
+            if (filterType !== 'all' && record.record_type !== filterType) {
+                return false;
+            }
+
+            // Filtro por data
+            if (filterDateStart || filterDateEnd) {
+                const recordDate = parseISO(record.timestamp);
+                
+                if (filterDateStart) {
+                    const startDate = startOfDay(parseISO(filterDateStart));
+                    if (recordDate < startDate) return false;
+                }
+                
+                if (filterDateEnd) {
+                    const endDate = endOfDay(parseISO(filterDateEnd));
+                    if (recordDate > endDate) return false;
+                }
+            }
+
+            return true;
+        });
+    }, [records, searchTerm, filterEmployee, filterType, filterDateStart, filterDateEnd]);
+
+    // Filtrar resumos diários
+    const filteredSummaries = useMemo(() => {
+        return dailySummaries.filter(summary => {
+            // Filtro por busca (nome do funcionário)
+            if (searchTerm) {
+                if (!summary.userName.toLowerCase().includes(searchTerm.toLowerCase())) {
+                    return false;
+                }
+            }
+
+            // Filtro por funcionário
+            if (filterEmployee !== 'all' && summary.userId !== filterEmployee) {
+                return false;
+            }
+
+            // Filtro por data
+            if (filterDateStart || filterDateEnd) {
+                const summaryDate = parseISO(summary.date);
+                
+                if (filterDateStart) {
+                    const startDate = startOfDay(parseISO(filterDateStart));
+                    if (summaryDate < startDate) return false;
+                }
+                
+                if (filterDateEnd) {
+                    const endDate = endOfDay(parseISO(filterDateEnd));
+                    if (summaryDate > endDate) return false;
+                }
+            }
+
+            return true;
+        });
+    }, [dailySummaries, searchTerm, filterEmployee, filterDateStart, filterDateEnd]);
+
+    // Calcular banco de horas filtrado
+    const filteredBankHours = useMemo(() => {
+        const bankByUser: { [userId: string]: { name: string; totalBalance: number } } = {};
+
+        filteredSummaries.forEach(summary => {
+            if (!bankByUser[summary.userId]) {
+                bankByUser[summary.userId] = { name: summary.userName, totalBalance: 0 };
+            }
+            bankByUser[summary.userId].totalBalance += summary.balanceMinutes;
+        });
+
+        return Object.values(bankByUser);
+    }, [filteredSummaries]);
+
+    // Limpar todos os filtros
+    const clearFilters = () => {
+        setSearchTerm('');
+        setFilterEmployee('all');
+        setFilterType('all');
+        setFilterDateStart('');
+        setFilterDateEnd('');
+    };
+
+    // Verificar se há filtros ativos
+    const hasActiveFilters = searchTerm || filterEmployee !== 'all' || filterType !== 'all' || filterDateStart || filterDateEnd;
+
     return (
         <Layout title="Registros de Ponto">
             <div className="mb-8">
@@ -314,7 +456,7 @@ function AdminRecordsContent() {
                 </div>
 
                 {/* Toggle View Mode */}
-                <div className="btn-group mb-6" style={{ display: 'flex', gap: '0.5rem' }}>
+                <div className="btn-group mb-4" style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                         onClick={() => setViewMode('records')}
                         className={`btn ${viewMode === 'records' ? 'btn-primary' : 'btn-outline'}`}
@@ -331,6 +473,166 @@ function AdminRecordsContent() {
                     </button>
                 </div>
 
+                {/* Barra de Busca e Filtros */}
+                <div className="glass-panel mb-6" style={{ padding: '1rem' }}>
+                    {/* Linha principal: Busca + Botão de Filtros */}
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* Campo de Busca */}
+                        <div style={{ flex: '1', minWidth: '200px', position: 'relative' }}>
+                            <Search 
+                                size={18} 
+                                style={{ 
+                                    position: 'absolute', 
+                                    left: '0.75rem', 
+                                    top: '50%', 
+                                    transform: 'translateY(-50%)',
+                                    opacity: 0.5
+                                }} 
+                            />
+                            <input
+                                type="text"
+                                placeholder="Buscar por nome do funcionário..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="input"
+                                style={{ paddingLeft: '2.5rem', marginBottom: 0 }}
+                            />
+                        </div>
+
+                        {/* Botão Mostrar/Ocultar Filtros */}
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`btn ${showFilters || hasActiveFilters ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        >
+                            <Filter size={18} />
+                            Filtros
+                            {hasActiveFilters && (
+                                <span 
+                                    style={{ 
+                                        background: 'rgba(255,255,255,0.2)', 
+                                        borderRadius: '50%', 
+                                        width: '20px', 
+                                        height: '20px', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center',
+                                        fontSize: '0.75rem'
+                                    }}
+                                >
+                                    !
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Botão Limpar Filtros */}
+                        {hasActiveFilters && (
+                            <button
+                                onClick={clearFilters}
+                                className="btn btn-outline"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                title="Limpar filtros"
+                            >
+                                <X size={18} />
+                                Limpar
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Painel de Filtros Expandido */}
+                    {showFilters && (
+                        <div 
+                            style={{ 
+                                marginTop: '1rem', 
+                                paddingTop: '1rem', 
+                                borderTop: '1px solid var(--border)',
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                                gap: '1rem'
+                            }}
+                        >
+                            {/* Filtro por Funcionário */}
+                            <div>
+                                <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <User size={14} />
+                                    Funcionário
+                                </label>
+                                <select
+                                    value={filterEmployee}
+                                    onChange={(e) => setFilterEmployee(e.target.value)}
+                                    className="input"
+                                    style={{ marginBottom: 0 }}
+                                >
+                                    <option value="all">Todos</option>
+                                    {uniqueEmployees.map(emp => (
+                                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Filtro por Tipo (apenas na aba Registros) */}
+                            {viewMode === 'records' && (
+                                <div>
+                                    <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <LogIn size={14} />
+                                        Tipo
+                                    </label>
+                                    <select
+                                        value={filterType}
+                                        onChange={(e) => setFilterType(e.target.value as 'all' | 'entrada' | 'saida')}
+                                        className="input"
+                                        style={{ marginBottom: 0 }}
+                                    >
+                                        <option value="all">Todos</option>
+                                        <option value="entrada">Entrada</option>
+                                        <option value="saida">Saída</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Filtro por Data Início */}
+                            <div>
+                                <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Calendar size={14} />
+                                    Data Início
+                                </label>
+                                <input
+                                    type="date"
+                                    value={filterDateStart}
+                                    onChange={(e) => setFilterDateStart(e.target.value)}
+                                    className="input"
+                                    style={{ marginBottom: 0 }}
+                                />
+                            </div>
+
+                            {/* Filtro por Data Fim */}
+                            <div>
+                                <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Calendar size={14} />
+                                    Data Fim
+                                </label>
+                                <input
+                                    type="date"
+                                    value={filterDateEnd}
+                                    onChange={(e) => setFilterDateEnd(e.target.value)}
+                                    className="input"
+                                    style={{ marginBottom: 0 }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Contador de resultados */}
+                    {hasActiveFilters && (
+                        <div style={{ marginTop: '0.75rem', fontSize: '0.875rem' }} className="text-muted">
+                            {viewMode === 'records' 
+                                ? `${filteredRecords.length} registro(s) encontrado(s)`
+                                : `${filteredSummaries.length} dia(s) encontrado(s)`
+                            }
+                        </div>
+                    )}
+                </div>
+
                 {loading ? (
                     <p className="text-muted">Carregando...</p>
                 ) : viewMode === 'records' ? (
@@ -345,26 +647,34 @@ function AdminRecordsContent() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {records.map((record) => (
-                                    <tr key={record.id}>
-                                        <td style={{ fontWeight: 500 }}>{record.users?.name || 'Desconhecido'}</td>
-                                        <td>
-                                            {format(new Date(record.timestamp), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
-                                        </td>
-                                        <td>
-                                            <span 
-                                                className={`badge ${record.record_type === 'entrada' ? 'badge-success' : 'badge-warning'}`}
-                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                                            >
-                                                {record.record_type === 'entrada' ? (
-                                                    <><LogIn size={14} /> Entrada</>
-                                                ) : (
-                                                    <><LogOut size={14} /> Saída</>
-                                                )}
-                                            </span>
+                                {filteredRecords.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={3} style={{ textAlign: 'center', padding: '2rem' }} className="text-muted">
+                                            Nenhum registro encontrado
                                         </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    filteredRecords.map((record) => (
+                                        <tr key={record.id}>
+                                            <td style={{ fontWeight: 500 }}>{record.users?.name || 'Desconhecido'}</td>
+                                            <td>
+                                                {format(new Date(record.timestamp), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                                            </td>
+                                            <td>
+                                                <span 
+                                                    className={`badge ${record.record_type === 'entrada' ? 'badge-success' : 'badge-warning'}`}
+                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                                                >
+                                                    {record.record_type === 'entrada' ? (
+                                                        <><LogIn size={14} /> Entrada</>
+                                                    ) : (
+                                                        <><LogOut size={14} /> Saída</>
+                                                    )}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -374,35 +684,41 @@ function AdminRecordsContent() {
                         {/* Cards de Banco de Horas Total por Funcionário */}
                         <div className="mb-6">
                             <h2 className="text-lg font-bold mb-4">Saldo Total de Horas</h2>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-                                {bankHours.map((user, idx) => (
-                                    <div key={idx} className="glass-panel" style={{ padding: '1.25rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div>
-                                                <h3 className="font-bold">{user.name}</h3>
-                                                <p className="text-sm text-muted">Banco de Horas</p>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                {user.totalBalance > 0 ? (
-                                                    <TrendingUp size={20} className="text-success" />
-                                                ) : user.totalBalance < 0 ? (
-                                                    <TrendingDown size={20} className="text-error" />
-                                                ) : (
-                                                    <Minus size={20} className="text-muted" />
-                                                )}
-                                                <span 
-                                                    className={`text-lg font-bold ${
-                                                        user.totalBalance > 0 ? 'text-success' : 
-                                                        user.totalBalance < 0 ? 'text-error' : 'text-muted'
-                                                    }`}
-                                                >
-                                                    {formatMinutesToHours(user.totalBalance)}
-                                                </span>
+                            {filteredBankHours.length === 0 ? (
+                                <div className="glass-panel text-muted" style={{ padding: '2rem', textAlign: 'center' }}>
+                                    Nenhum dado encontrado
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+                                    {filteredBankHours.map((user, idx) => (
+                                        <div key={idx} className="glass-panel" style={{ padding: '1.25rem' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    <h3 className="font-bold">{user.name}</h3>
+                                                    <p className="text-sm text-muted">Banco de Horas</p>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    {user.totalBalance > 0 ? (
+                                                        <TrendingUp size={20} className="text-success" />
+                                                    ) : user.totalBalance < 0 ? (
+                                                        <TrendingDown size={20} className="text-error" />
+                                                    ) : (
+                                                        <Minus size={20} className="text-muted" />
+                                                    )}
+                                                    <span 
+                                                        className={`text-lg font-bold ${
+                                                            user.totalBalance > 0 ? 'text-success' : 
+                                                            user.totalBalance < 0 ? 'text-error' : 'text-muted'
+                                                        }`}
+                                                    >
+                                                        {formatMinutesToHours(user.totalBalance)}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Tabela de Resumo Diário */}
@@ -419,42 +735,50 @@ function AdminRecordsContent() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {dailySummaries.map((summary, idx) => (
-                                        <tr key={idx}>
-                                            <td style={{ fontWeight: 500 }}>
-                                                {format(parseISO(summary.date), "dd/MM/yyyy", { locale: ptBR })}
-                                            </td>
-                                            <td>{summary.userName}</td>
-                                            <td>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                                                    {summary.records.map((rec, i) => (
-                                                        <span 
-                                                            key={i}
-                                                            className={`badge ${rec.type === 'entrada' ? 'badge-success' : 'badge-warning'}`}
-                                                            style={{ fontSize: '0.7rem' }}
-                                                        >
-                                                            {rec.type === 'entrada' ? '→' : '←'} {rec.time}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span className="font-medium">
-                                                    {formatWorkedTime(summary.totalWorkedMinutes)}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span 
-                                                    className={`font-bold ${
-                                                        summary.balanceMinutes > 0 ? 'text-success' : 
-                                                        summary.balanceMinutes < 0 ? 'text-error' : 'text-muted'
-                                                    }`}
-                                                >
-                                                    {formatMinutesToHours(summary.balanceMinutes)}
-                                                </span>
+                                    {filteredSummaries.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }} className="text-muted">
+                                                Nenhum resumo encontrado
                                             </td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        filteredSummaries.map((summary, idx) => (
+                                            <tr key={idx}>
+                                                <td style={{ fontWeight: 500 }}>
+                                                    {format(parseISO(summary.date), "dd/MM/yyyy", { locale: ptBR })}
+                                                </td>
+                                                <td>{summary.userName}</td>
+                                                <td>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                                                        {summary.records.map((rec, i) => (
+                                                            <span 
+                                                                key={i}
+                                                                className={`badge ${rec.type === 'entrada' ? 'badge-success' : 'badge-warning'}`}
+                                                                style={{ fontSize: '0.7rem' }}
+                                                            >
+                                                                {rec.type === 'entrada' ? '→' : '←'} {rec.time}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span className="font-medium">
+                                                        {formatWorkedTime(summary.totalWorkedMinutes)}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span 
+                                                        className={`font-bold ${
+                                                            summary.balanceMinutes > 0 ? 'text-success' : 
+                                                            summary.balanceMinutes < 0 ? 'text-error' : 'text-muted'
+                                                        }`}
+                                                    >
+                                                        {formatMinutesToHours(summary.balanceMinutes)}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>
