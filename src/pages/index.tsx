@@ -41,18 +41,27 @@ export default function Home() {
           scanner.stop().catch(() => {});
           setShowScanner(false);
           
-          // Verificar se é uma URL válida do ponto
-          if (decodedText.includes('/ponto')) {
-            // Extrair o path relativo
-            try {
-              const url = new URL(decodedText);
-              router.push(url.pathname + url.search);
-            } catch {
-              // Se não for URL completa, tentar usar diretamente
-              router.push(decodedText);
+          try {
+            const url = new URL(decodedText);
+            const path = url.pathname + url.search;
+            
+            // Detectar tipo de QR Code
+            if (decodedText.includes('/ponto')) {
+              // QR Code de bater ponto
+              router.push(path);
+            } else if (decodedText.includes('/vincular-device')) {
+              // QR Code de vincular dispositivo
+              router.push(path);
+            } else {
+              setScanError('QR Code inválido. Use um QR Code de ponto ou de vincular dispositivo.');
             }
-          } else {
-            setScanError('QR Code inválido. Use um QR Code de ponto.');
+          } catch {
+            // Se não for URL completa, verificar se é path relativo
+            if (decodedText.includes('/ponto') || decodedText.includes('/vincular-device')) {
+              router.push(decodedText);
+            } else {
+              setScanError('QR Code inválido. Use um QR Code de ponto ou de vincular dispositivo.');
+            }
           }
         },
         () => {
@@ -113,7 +122,7 @@ export default function Home() {
             </div>
             <h2 className="card-title" style={{ fontSize: '1.5rem', color: 'white' }}>Escanear QR Code</h2>
             <p className="card-desc" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-              Escaneie o QR Code do local para bater ponto.
+              Bater ponto ou vincular dispositivo.
             </p>
           </button>
         </div>
@@ -130,7 +139,7 @@ export default function Home() {
               Escanear QR Code
             </h2>
             <p className="text-muted" style={{ textAlign: 'center', marginBottom: '1rem' }}>
-              Aponte a câmera para o QR Code do local
+              Aponte para um QR Code de ponto ou vinculação
             </p>
             <div 
               id="qr-reader" 
