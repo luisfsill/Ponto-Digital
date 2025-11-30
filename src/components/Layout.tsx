@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { Moon, Sun, LogOut, User, Shield, Home, QrCode } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+// Importar QRScanner dinamicamente para evitar SSR
+const QRScanner = dynamic(() => import('./QRScanner'), { ssr: false });
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -17,6 +21,17 @@ export default function Layout({ children, title = 'Ponto Digital' }: LayoutProp
     const router = useRouter();
     const isAdminPage = router.pathname.startsWith('/admin');
     const isLoginPage = router.pathname === '/login';
+    const [showScanner, setShowScanner] = useState(false);
+
+    const handleQRScan = (result: string) => {
+        // Se o QR Code contiver uma URL de vinculação, redireciona
+        if (result.includes('/vincular-device')) {
+            window.location.href = result;
+        } else {
+            // Caso seja apenas o userId, monta a URL
+            window.location.href = `/vincular-device?userId=${result}`;
+        }
+    };
 
     return (
         <>
@@ -55,15 +70,15 @@ export default function Layout({ children, title = 'Ponto Digital' }: LayoutProp
                                 <span>Admin</span>
                             </Link>
                         )}
-                        {/* Botão QR - simples ícone que leva à vinculação */}
-                        <Link
-                            href="/vincular-device"
+                        {/* Botão QR - abre scanner para vincular dispositivo */}
+                        <button
+                            onClick={() => setShowScanner(true)}
                             className="btn btn-outline"
-                            aria-label="Vincular dispositivo"
+                            aria-label="Escanear QR Code"
                             style={{ padding: '0.5rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                         >
                             <QrCode size={18} />
-                        </Link>
+                        </button>
                         {/* Toggle Theme - sempre visível */}
                         <button
                             onClick={toggleTheme}
@@ -92,6 +107,13 @@ export default function Layout({ children, title = 'Ponto Digital' }: LayoutProp
                     <footer className="text-center py-6 text-sm text-muted">
                         &copy; {new Date().getFullYear()} Ponto Digital
                     </footer>
+
+                {/* QR Scanner Modal */}
+                <QRScanner
+                    isOpen={showScanner}
+                    onClose={() => setShowScanner(false)}
+                    onScan={handleQRScan}
+                />
             </div>
         </>
     );
