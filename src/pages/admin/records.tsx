@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { Record, RecordType, DailyWorkSummary, User } from '@/types';
+import { Record as RecordType_, RecordType, DailyWorkSummary, User } from '@/types';
 import { format, parseISO, differenceInMinutes, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getAuthHeaders } from '@/lib/authHeaders';
@@ -14,7 +14,7 @@ import { useFeedback } from '@/context/FeedbackContext';
 function AdminRecordsContent() {
     const router = useRouter();
     const { showError, showSuccess, showConfirm } = useFeedback();
-    const [records, setRecords] = useState<(Record & { users: { name: string } })[]>([]);
+    const [records, setRecords] = useState<(RecordType_ & { users: { name: string } })[]>([]);
     const [loading, setLoading] = useState(true);
     const [importing, setImporting] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -78,9 +78,9 @@ function AdminRecordsContent() {
     };
 
     // Processa os registros para determinar se cada um é entrada ou saída
-    const processRecordTypes = (rawRecords: (Record & { users: { name: string } })[]): (Record & { users: { name: string } })[] => {
+    const processRecordTypes = (rawRecords: (RecordType_ & { users: { name: string } })[]): (RecordType_ & { users: { name: string } })[] => {
         // Agrupar por usuário e data
-        const groupedByUserAndDate: { [key: string]: (Record & { users: { name: string } })[] } = {};
+        const groupedByUserAndDate: { [key: string]: (RecordType_ & { users: { name: string } })[] } = {};
 
         rawRecords.forEach(record => {
             const date = format(parseISO(record.timestamp), 'yyyy-MM-dd');
@@ -108,8 +108,8 @@ function AdminRecordsContent() {
     };
 
     // Calcula o resumo diário de horas trabalhadas
-    const calculateDailySummaries = (processedRecords: (Record & { users: { name: string } })[]): DailyWorkSummary[] => {
-        const groupedByUserAndDate: { [key: string]: (Record & { users: { name: string } })[] } = {};
+    const calculateDailySummaries = (processedRecords: (RecordType_ & { users: { name: string } })[]): DailyWorkSummary[] => {
+        const groupedByUserAndDate: { [key: string]: (RecordType_ & { users: { name: string } })[] } = {};
 
         processedRecords.forEach(record => {
             const date = format(parseISO(record.timestamp), 'yyyy-MM-dd');
