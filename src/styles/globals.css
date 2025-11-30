@@ -1350,6 +1350,19 @@ tr:hover td {
   color: var(--text);
 }
 
+/* Responsivo para mobile */
+@media (max-width: 640px) {
+  .home-title {
+    font-size: 1.75rem !important;
+    gap: 0.5rem !important;
+  }
+  
+  .home-title img {
+    width: 48px !important;
+    height: 48px !important;
+  }
+}
+
 .home-card-neon {
   border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: none;
