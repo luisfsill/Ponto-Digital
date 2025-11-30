@@ -3,100 +3,30 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 const DEVICE_ID_KEY = 'ponto_device_id';
 
-// Gera um UUID v4
-function generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
-
-// Salva no IndexedDB para maior persistência
-async function saveToIndexedDB(deviceId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('PontoDigitalDB', 1);
-        
-        request.onerror = () => reject(request.error);
-        
-        request.onupgradeneeded = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains('device')) {
-                db.createObjectStore('device', { keyPath: 'id' });
-            }
-        };
-        
-        request.onsuccess = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            const transaction = db.transaction(['device'], 'readwrite');
-            const store = transaction.objectStore('device');
-            store.put({ id: 'deviceId', value: deviceId });
-            transaction.oncomplete = () => resolve();
-            transaction.onerror = () => reject(transaction.error);
-        };
-    });
-}
-
-// Recupera do IndexedDB
-async function getFromIndexedDB(): Promise<string | null> {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('PontoDigitalDB', 1);
-        
-        request.onerror = () => resolve(null);
-        
-        request.onupgradeneeded = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains('device')) {
-                db.createObjectStore('device', { keyPath: 'id' });
-            }
-        };
-        
-        request.onsuccess = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            const transaction = db.transaction(['device'], 'readonly');
-            const store = transaction.objectStore('device');
-            const getRequest = store.get('deviceId');
-            
-            getRequest.onsuccess = () => {
-                resolve(getRequest.result?.value || null);
-            };
-            getRequest.onerror = () => resolve(null);
-        };
-    });
-}
-
-// Obtém ou gera o Device ID persistente
+// Obtém o Device ID - prioriza localStorage, gera via fingerprint se não existir
 async function getOrCreateDeviceId(): Promise<string> {
-    // 1. Tentar recuperar do localStorage
-    let deviceId = localStorage.getItem(DEVICE_ID_KEY);
-    
-    // 2. Se não encontrou, tentar do IndexedDB
-    if (!deviceId) {
-        deviceId = await getFromIndexedDB();
+    // 1. Primeiro, tentar recuperar do localStorage (é persistente)
+    const storedId = localStorage.getItem(DEVICE_ID_KEY);
+    if (storedId) {
+        console.log('📱 Device ID (localStorage):', storedId);
+        return storedId;
     }
     
-    // 3. Se ainda não tem, gerar novo UUID + fingerprint
-    if (!deviceId) {
-        try {
-            const fp = await FingerprintJS.load();
-            const result = await fp.get();
-            // Combina UUID com parte do fingerprint para maior unicidade
-            deviceId = `${generateUUID()}-${result.visitorId.substring(0, 8)}`;
-        } catch {
-            // Se fingerprint falhar, usa só UUID
-            deviceId = generateUUID();
-        }
-    }
-    
-    // 4. Salvar em ambos os storages para redundância
-    localStorage.setItem(DEVICE_ID_KEY, deviceId);
+    // 2. Se não existe, gerar novo via FingerprintJS
     try {
-        await saveToIndexedDB(deviceId);
-    } catch (e) {
-        console.warn('Não foi possível salvar no IndexedDB:', e);
+        const fp = await FingerprintJS.load();
+        const result = await fp.get();
+        const deviceId = result.visitorId;
+        
+        // Salvar no localStorage para próximas vezes
+        localStorage.setItem(DEVICE_ID_KEY, deviceId);
+        
+        console.log('📱 Device ID (novo fingerprint):', deviceId);
+        return deviceId;
+    } catch (error) {
+        console.error('Erro ao gerar fingerprint:', error);
+        throw new Error('Não foi possível identificar o dispositivo');
     }
-    
-    return deviceId;
 }
 
 export function useDeviceFingerprint() {
@@ -108,7 +38,6 @@ export function useDeviceFingerprint() {
         const initDeviceId = async () => {
             try {
                 const id = await getOrCreateDeviceId();
-                console.log('📱 Device ID (Persistente):', id);
                 setDeviceId(id);
             } catch (err) {
                 console.error('Failed to get device ID', err);

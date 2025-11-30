@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
-import { Moon, Sun, LogOut, User, Shield, Home } from 'lucide-react';
+import { Moon, Sun, LogOut, User, Shield, Home, QrCode } from 'lucide-react';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -55,6 +55,15 @@ export default function Layout({ children, title = 'Ponto Digital' }: LayoutProp
                                 <span>Admin</span>
                             </Link>
                         )}
+                        {/* Botão QR - simples ícone que leva à vinculação */}
+                        <Link
+                            href="/vincular-device"
+                            className="btn btn-outline"
+                            aria-label="Vincular dispositivo"
+                            style={{ padding: '0.5rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                            <QrCode size={18} />
+                        </Link>
                         {/* Toggle Theme - sempre visível */}
                         <button
                             onClick={toggleTheme}
