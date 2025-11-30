@@ -4,7 +4,7 @@ import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { User, DeviceAuthorization } from '@/types';
 import { QRCodeSVG } from 'qrcode.react';
-import { Plus, QrCode, X, ArrowLeft, Pencil, Trash2, Smartphone, AlertTriangle } from 'lucide-react';
+import { Plus, QrCode, X, ArrowLeft, Pencil, Trash2, Smartphone, AlertTriangle, Link2 } from 'lucide-react';
 import { getAuthHeaders } from '@/lib/authHeaders';
 import { useFeedback } from '@/context/FeedbackContext';
 import { format } from 'date-fns';
@@ -691,9 +691,16 @@ function AdminUsersContent() {
                                 />
                             </div>
 
-                            <p className="text-xs text-muted mb-6" style={{ wordBreak: 'break-all', maxWidth: '300px' }}>
-                                {getBindingUrl(selectedUserForQR.id)}
-                            </p>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => {
+                                    window.open(getBindingUrl(selectedUserForQR.id), '_blank');
+                                }}
+                                style={{ marginBottom: '1rem' }}
+                            >
+                                <Link2 size={16} />
+                                Via Link
+                            </button>
 
                         </div>
                     </div>
